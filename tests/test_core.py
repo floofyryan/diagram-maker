@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -141,3 +142,80 @@ def test_guess_role():
     assert guess_role("CB[7]") == "host"
     assert guess_role("silica NP") == "filler"
     assert guess_role("swelling ratio") is None
+
+
+MOCK = Path(__file__).resolve().parents[1] / "examples" / "mock_hydrogel_data.xlsx"
+
+
+def test_mock_workbook_tabs():
+    tabs = hio.sheet_names(MOCK)
+    assert tabs == ["Laponite-bCD-PEG", "Silica-aCD-PEG", "MMT-CB8-two guests",
+                    "Mixed fillers-hosts"]          # instructions tab skipped
+    seen = set()
+    for tab in tabs:
+        p, _ = hio.load(MOCK, sheet=tab)
+        assert len(p.samples) == 12
+        assert np.allclose(p.totals(), 100)
+        assert "water" in p.component_names
+        seen.add(tuple(p.component_names))
+    assert len(seen) == len(tabs)                   # every tab is different
+    p, _ = hio.load(MOCK, sheet="MMT-CB8-two guests")
+    assert p.components_by_role("guest") == ["PVA-Np", "PVA-MV"]
+
+
+def test_mock_workbook_all_tabs_combined():
+    p, _ = hio.load(MOCK, sheet=hio.ALL_SHEETS)
+    assert len(p.samples) == 48
+    assert p.samples["dataset"].nunique() == 4
+    assert not p.samples[p.component_names].isna().any().any()
+    assert np.allclose(p.totals(), 100)
+    spec = PlotSpec("ternary", [Axis("role:filler"), Axis("role:host"),
+                                Axis("role:guest")], color_by="dataset",
+                    highlight='dataset == "Silica-aCD-PEG"')
+    prep = prepare(p, spec)
+    assert prep.color_mode == "category" and len(prep.categories) == 4
+    assert prep.data["hl"].sum() == 12
+
+
+def test_blank_water_formulas_are_computed(tmp_path):
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "samples"
+    ws.append(["sample", "water", "laponite", "PEG"])
+    ws.append(["a", "=100-SUM(C2:D2)", 2, 3])       # no cached value
+    f = tmp_path / "w.xlsx"
+    wb.save(f)
+    p, _ = hio.load(f)
+    assert p.samples["water"].tolist() == [95]
+
+
+def test_load_cleans_messy_sheets(tmp_path):
+    df = pd.DataFrame({"sample": ["a", None, "c"], "water": [90, 95, 80],
+                       "laponite": [10, 5, 20], "Unnamed: 3": [None] * 3})
+    comps = pd.DataFrame({"name": ["water", "laponite", "laponite"],
+                          "role": ["water", "filler", "filler"]})
+    p = hio.project_from_frames(df, comps)
+    assert p.component_names == ["water", "laponite"]
+    assert p.samples["sample"].tolist() == ["a", "S2", "c"]
+    assert "Unnamed: 3" not in p.samples.columns
+
+
+def test_manual_zoom_hides_points_outside(proj):
+    spec = PlotSpec("ternary", [Axis("role:filler"), Axis("role:host"),
+                                Axis("role:guest")], ternary_min=(25, 0, 0))
+    prep = prepare(proj, spec)
+    assert prep.outside == ["A"]                    # A: 20 % filler, B: 27 %
+    assert prep.data["sample"].tolist() == ["B"]
+    mpl_plots.to_bytes(mpl_plots.plot(proj, spec), "png", dpi=40)
+
+
+@pytest.mark.parametrize("name, role", [
+    ("water", "water"), ("Laponite XLG", "filler"), ("silica NP", "filler"),
+    ("MMT", "filler"), ("CNC", "filler"), ("beta-CD", "host"),
+    ("alpha-CD", "host"), ("CB[8]", "host"), ("PEG-Ad", "guest"),
+    ("PEG 20k", "guest"), ("PVA-Np", "guest"), ("PVA-MV", "guest"),
+    ("PAAm-Ad", "guest"), ("G' (kPa)", None), ("gelled", None),
+    ("self-healing (%)", None), ("gel time (min)", None)])
+def test_guess_role_on_mock_names(name, role):
+    assert guess_role(name) == role

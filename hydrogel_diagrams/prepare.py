@@ -45,11 +45,8 @@ class Prepared:
     hull: list[tuple[float, ...]] | None = None
     has_highlight: bool = False
     tern_min: tuple[float, float, float] = (0.0, 0.0, 0.0)  # fractions
-    dropped: list[str] = field(default_factory=list)
-
-    @property
-    def coord_cols(self) -> list[str]:
-        return [c for c in ("c0", "c1", "c2") if c in self.data.columns]
+    dropped: list[str] = field(default_factory=list)   # no data on the axes
+    outside: list[str] = field(default_factory=list)   # outside ternary zoom
 
     def marker_index(self, value) -> int:
         if not self.marker_categories:
@@ -192,6 +189,11 @@ def prepare(project: Project, spec: PlotSpec) -> Prepared:
     prep.data = df.loc[keep].copy()
     if spec.kind == "ternary":
         prep.tern_min = ternary_window(prep.data, spec)
+        inside = np.ones(len(prep.data), dtype=bool)
+        for c, m in zip(coords, prep.tern_min):
+            inside &= (prep.data[c] >= m - 1e-9).to_numpy()
+        prep.outside = prep.data.loc[~inside, "sample"].tolist()
+        prep.data = prep.data.loc[inside]
 
     # -- hull of highlighted points -------------------------------------------
     if spec.hull_of_highlight and prep.has_highlight and spec.kind != "scatter3d":

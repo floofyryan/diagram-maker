@@ -5,8 +5,9 @@ Run with:  streamlit run app.py
 
 from __future__ import annotations
 
-import json
+import io
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
@@ -15,7 +16,7 @@ from hydrogel_diagrams import mpl_plots, plotly_plots
 from hydrogel_diagrams.examples import example_plots, example_project
 from hydrogel_diagrams.model import (ROLE_PREFIX, ROLES, SAMPLE_COL,
                                      TOTAL_COL, Project)
-from hydrogel_diagrams.prepare import query_frame
+from hydrogel_diagrams.prepare import prepare, query_frame
 from hydrogel_diagrams.spec import Axis, PlotSpec, Region
 
 st.set_page_config(page_title="Hydrogel Diagram Maker", layout="wide")
@@ -66,18 +67,39 @@ def sidebar():
     st.sidebar.subheader("Open")
     up = st.sidebar.file_uploader("Excel (.xlsx) or CSV", type=["xlsx", "xls",
                                                                "csv"])
-    if up is not None and ss.loaded_file != (up.name, up.size):
-        try:
-            proj, plots = hio.load(up, filename=up.name)
-            ss.project = proj
-            ss.presets.update(plots)
-            ss.loaded_file = (up.name, up.size)
-            bump_editors()
-            st.sidebar.success(f"Loaded {len(proj.samples)} samples and "
-                               f"{len(proj.components)} components. "
-                               "Check the roles on the Components tab.")
-        except Exception as exc:  # noqa: BLE001
-            st.sidebar.error(f"Could not read file: {exc}")
+    if up is not None:
+        data = up.getvalue()
+        sheet = None
+        if not up.name.lower().endswith(".csv"):
+            try:
+                tabs = _data_tabs(data)
+            except Exception as exc:  # noqa: BLE001
+                st.sidebar.error(f"Could not read file: {exc}")
+                tabs = []
+            if len(tabs) > 1:
+                options = tabs + [hio.ALL_SHEETS]
+                if ss.get("sheet_pick") not in options:
+                    ss.sheet_pick = options[0]
+                sheet = st.sidebar.selectbox(
+                    "Which tab?", options, key="sheet_pick",
+                    help="Each tab is loaded as its own set of samples. "
+                         "'All tabs combined' stacks them and adds a "
+                         "'dataset' column you can color or highlight by.")
+        if ss.loaded_file != (up.file_id, sheet):
+            try:
+                proj, plots = hio.load(io.BytesIO(data), filename=up.name,
+                                       sheet=sheet)
+                ss.project = proj
+                ss.presets.update(plots)
+                bump_editors()
+                where = f" from '{sheet}'" if sheet else ""
+                st.sidebar.success(f"Loaded {len(proj.samples)} samples and "
+                                   f"{len(proj.components)} components"
+                                   f"{where}. Check the roles on the "
+                                   "Components tab.")
+            except Exception as exc:  # noqa: BLE001
+                st.sidebar.error(f"Could not read file: {exc}")
+            ss.loaded_file = (up.file_id, sheet)
 
     c1, c2 = st.sidebar.columns(2)
     if c1.button("Demo data", width="stretch"):
@@ -92,15 +114,18 @@ def sidebar():
         st.rerun()
 
     st.sidebar.subheader("Save")
+    # files are built when clicked; the callables can't read session_state
+    # then, so bind what they need now
+    proj, presets = project(), dict(ss.presets)
     st.sidebar.download_button(
         "Download project (.xlsx)",
-        hio.save(project(), plots=ss.presets),
+        lambda: hio.save(proj, plots=presets),
         file_name="hydrogel_project.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         width="stretch")
     st.sidebar.download_button(
         "Download samples (.csv)",
-        project().samples.to_csv(index=False).encode(),
+        lambda: proj.samples.to_csv(index=False).encode(),
         file_name="hydrogel_samples.csv", mime="text/csv",
         width="stretch")
     st.sidebar.caption("The .xlsx keeps components, samples and saved plot "
@@ -406,6 +431,7 @@ def plot_tab():
             st.info("Choose something for every axis to draw the plot.")
             return
         try:
+            prep = prepare(p, spec)
             fig = plotly_plots.plot(p, spec)
         except Exception as exc:  # noqa: BLE001
             st.error(f"Could not draw the plot: {exc}")
@@ -415,31 +441,37 @@ def plot_tab():
         if view == "Interactive":
             st.plotly_chart(fig, width="stretch")
         else:
-            st.pyplot(mpl_plots.plot(p, spec), width="stretch")
+            static = mpl_plots.plot(p, spec)
+            st.pyplot(static, width="stretch")
+            plt.close(static)
 
         st.markdown("**Download**")
         cols = st.columns(5)
         for col, fmt in zip(cols[:3], ("png", "svg", "pdf")):
+            # files are only rendered when the button is clicked
             col.download_button(
-                fmt.upper(), mpl_plots.to_bytes(mpl_plots.plot(p, spec), fmt),
+                fmt.upper(),
+                lambda fmt=fmt: mpl_plots.to_bytes(mpl_plots.plot(p, spec),
+                                                   fmt),
                 file_name=f"hydrogel_{spec.kind}.{fmt}",
                 width="stretch")
-        cols[3].download_button("HTML", plotly_plots.to_html(fig),
+        cols[3].download_button("HTML", lambda: plotly_plots.to_html(fig),
                                 file_name=f"hydrogel_{spec.kind}.html",
                                 mime="text/html", width="stretch")
         cols[4].download_button("Settings", spec.to_json(),
                                 file_name="plot_settings.json",
                                 mime="application/json",
                                 width="stretch")
-        dropped = _dropped(p, spec)
-        if dropped:
-            st.caption("Not shown (all three axes are zero): "
-                       + ", ".join(dropped))
+        if prep.dropped:
+            st.caption("Not shown (no data for these axes): "
+                       + ", ".join(prep.dropped))
+        if prep.outside:
+            st.caption("Outside the zoomed area: " + ", ".join(prep.outside))
 
 
-def _dropped(p, spec):
-    from hydrogel_diagrams.prepare import prepare
-    return prepare(p, spec).dropped
+@st.cache_data(show_spinner=False)
+def _data_tabs(data: bytes) -> list[str]:
+    return hio.sheet_names(io.BytesIO(data))
 
 
 def help_tab():
@@ -457,6 +489,10 @@ def help_tab():
 ### Excel format
 Sheet `samples`: a `sample` column, one column per component (wt %), then
 property columns. Sheet `components`: `name`, `role`, `color`, `notes`.
+A workbook can have several data tabs (e.g. one per hydrogel system); after
+uploading, pick one under **Which tab?** or choose *all tabs combined* to
+compare them (a `dataset` column tells you which tab each sample came from).
+Try `examples/mock_hydrogel_data.xlsx`.
 If there is no `components` sheet, roles are guessed from the column names
 (e.g. *laponite* → filler, *beta-CD* → host, *PEG* → guest) and can be fixed
 on the Components tab. *Download project* in the sidebar gives you a

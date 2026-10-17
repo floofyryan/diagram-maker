@@ -48,6 +48,28 @@ The app opens in your browser. On Windows you can also double-click
 4. **Save**: *Download project (.xlsx)* in the sidebar. Upload it later to
    carry on.
 
+## Practice workbook
+
+`examples/mock_hydrogel_data.xlsx` is a practice file with made-up data.
+Each tab is a different hydrogel system with its own components:
+
+| tab                   | filler(s)          | host(s)            | guest(s)         | other    |
+|-----------------------|--------------------|--------------------|------------------|----------|
+| `Laponite-bCD-PEG`    | Laponite XLG       | beta-CD            | PEG-Ad           |          |
+| `Silica-aCD-PEG`      | silica NP          | alpha-CD           | PEG 20k          |          |
+| `MMT-CB8-two guests`  | MMT                | CB[8]              | PVA-Np, PVA-MV   |          |
+| `Mixed fillers-hosts` | Laponite XLG, CNC  | beta-CD, alpha-CD  | PAAm-Ad          | glycerol |
+
+It also has a `How to use` tab and a `components` tab that lists every
+ingredient's role. Blue cells are the ones you type in. Water is a formula
+(100 − everything else), so it updates when you change the other amounts.
+
+Upload it in the sidebar, then pick a tab under **Which tab?**. Choose
+**(all tabs combined)** to compare systems: the samples are stacked, a
+`dataset` column records which tab each one came from, and you can color,
+mark or highlight by it (`dataset == "Silica-aCD-PEG"`). Rebuild the file
+with `python examples/make_mock_workbook.py`.
+
 ## Excel format
 
 | sheet        | columns                                                           |
@@ -56,7 +78,10 @@ The app opens in your browser. On Windows you can also double-click
 | `components` | `name`, `role`, `color`, `notes`                                  |
 | `plots`      | saved plot settings (written by the app, optional)                |
 
-A workbook with only a samples sheet works too. Roles are then guessed from
+A workbook can have several data tabs, for example one per system. The app
+asks which one to load, or combines them all. Tabs named `How to use`,
+`README`, `notes` and so on are skipped. A workbook with only a samples
+sheet works too. Roles are then guessed from
 the column names (*laponite* → filler, *β-CD* → host, *PEG* → guest, ...)
 and you can fix them on the Components tab. `examples/demo_project.xlsx` is
 a ready-made template. Its data are made up.
@@ -67,7 +92,8 @@ a ready-made template. Its data are made up.
 from hydrogel_diagrams import Project, PlotSpec, Axis, Region
 from hydrogel_diagrams import io, mpl_plots, plotly_plots
 
-project, saved = io.load("my_project.xlsx")      # or build one in code:
+project, saved = io.load("my_project.xlsx")      # sheet="Silica-aCD-PEG" or
+                                                 # sheet=io.ALL_SHEETS; or in code:
 # project = Project()
 # project.add_component("water", "water")
 # project.add_component("laponite", "filler")
@@ -123,6 +149,7 @@ hydrogel_diagrams/prepare.py    shared data prep for both renderers
 hydrogel_diagrams/mpl_plots.py  static figures (matplotlib)
 hydrogel_diagrams/plotly_plots.py interactive figures (plotly)
 hydrogel_diagrams/io.py         Excel / CSV import and export
+examples/                       practice workbook, demo project, scripts
 tests/                          pytest suite
 ```
 

@@ -43,17 +43,24 @@ _ROLE_KEYWORDS = {
 
 
 def guess_role(name: str) -> str | None:
-    """Best-effort role guess from a column name (``None`` if no idea)."""
+    """Best-effort role guess from a column name (``None`` if no idea).
+
+    When several keywords match, the one nearest the start of the name wins,
+    so "PVA-Np" is a guest (PVA) rather than a filler (NP)."""
     low = name.lower()
+    tokens = _tokenize(low)
+    best = None  # (position, role)
     for role, words in _ROLE_KEYWORDS.items():
         for w in words:
-            # short keywords must match a whole token to avoid false hits
             if len(w) <= 3 and "[" not in w:
-                if w in _tokenize(low):
-                    return role
-            elif w in low:
-                return role
-    return None
+                # short keywords must be a whole word to avoid false hits
+                pos = tokens.index(w) if w in tokens else -1
+                pos = low.find(tokens[pos]) if pos >= 0 else -1
+            else:
+                pos = low.find(w)
+            if pos >= 0 and (best is None or pos < best[0]):
+                best = (pos, role)
+    return best[1] if best else None
 
 
 def _tokenize(text: str) -> list[str]:
