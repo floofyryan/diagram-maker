@@ -155,6 +155,9 @@ def _add_size_legend(fig, prep, spec, kind):
 
 def _layout(fig, prep, spec):
     labels = prep.axis_labels
+    titles = [t for t in (prep.color_label if prep.color_mode == "category"
+                          else "", prep.marker_label) if t]
+    fig.update_layout(legend_title_text=" / ".join(titles) or None)
     fig.update_layout(title=spec.title or None, template="plotly_white",
                       legend=dict(itemsizing="trace", x=1.12 if
                                   prep.color_mode == "continuous" else 1.02),

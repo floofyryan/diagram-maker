@@ -219,3 +219,48 @@ def test_manual_zoom_hides_points_outside(proj):
     ("self-healing (%)", None), ("gel time (min)", None)])
 def test_guess_role_on_mock_names(name, role):
     assert guess_role(name) == role
+
+
+def test_size_by_yes_no_and_3d_color_with_gaps():
+    p, _ = hio.load(MOCK, sheet=hio.ALL_SHEETS)
+    # size by a yes/no column; color by a number that is blank in some tabs
+    spec = PlotSpec("scatter3d", [Axis("role:filler"), Axis("role:host"),
+                                  Axis("role:guest")],
+                    size_by="gelled", color_by="gel time (min)")
+    prep = prepare(p, spec)
+    assert set(prep.data["size01"]) == {0.0, 1.0}
+    assert prep.data["color"].isna().any()
+    mpl_plots.to_bytes(mpl_plots.plot(p, spec), "png", dpi=40)
+    plotly_plots.plot(p, spec)
+
+
+def test_failed_static_plot_does_not_leak_figures(proj):
+    import matplotlib.pyplot as plt
+    plt.close("all")
+    bad = PlotSpec("ternary", [Axis("role:filler"), Axis("role:host"),
+                               Axis("role:guest")],
+                   regions=[Region("2D points on a triangle", [(0, 0), (1, 0),
+                                                              (0, 1)])])
+    with pytest.raises(ValueError):
+        mpl_plots.plot(proj, bad)
+    assert plt.get_fignums() == []
+
+
+def test_quick_plots_and_template_render():
+    from hydrogel_diagrams.examples import blank_template, quick_plots
+    for p in (example_project(), blank_template(),
+              hio.load(MOCK, sheet=hio.ALL_SHEETS)[0]):
+        plots = quick_plots(p)
+        assert len(plots) == 4
+        for spec in plots.values():
+            mpl_plots.to_bytes(mpl_plots.plot(p, spec), "png", dpi=30)
+            plotly_plots.plot(p, spec)
+
+
+def test_highlight_on_awkward_column_names(proj):
+    proj.add_property("G'' (Pa)")
+    proj.samples["G'' (Pa)"] = [5.0, 50.0]
+    spec = PlotSpec("ternary", [Axis("role:filler"), Axis("role:host"),
+                                Axis("role:guest")],
+                    highlight="`G'' (Pa)` > 10 and `filler type` != \"none\"")
+    assert prepare(proj, spec).data["hl"].tolist() == [False, True]

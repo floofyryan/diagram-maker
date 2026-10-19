@@ -1,57 +1,78 @@
 # Hydrogel Diagram Maker
 
-A small Python program for plotting hydrogel formulations made of **water**,
-**fillers** (clay, nanoparticles, ...), **host molecules** (cyclodextrins,
-cucurbiturils, ...) and **guest polymers**, plus anything else you add.
+Make triangle (ternary), 3D and 2D plots of hydrogel recipes made of
+**water**, **fillers** (clay, nanoparticles...), **host molecules**
+(cyclodextrins, cucurbiturils...) and **guest polymers**. You can type your
+data in or use an Excel sheet, and you can add as many fillers, hosts or
+polymers as you like.
 
-* Type data straight into tables, or open an Excel / CSV sheet.
-* Add or remove components at any time: a second guest polymer, a third host
-  or a new filler is just another row.
-* Plot **ternary diagrams**, **3D scatter** or **2D scatter**. Choose what
-  goes on each axis, either single components or the sum of a whole role
-  (e.g. *all hosts*).
-* Map **dot size**, **color** and **marker shape** to measured properties
-  (modulus, swelling, ...) or to categories (filler type, host type, gelled
-  yes/no).
-* **Highlight** samples that match a condition (`gelled == True`), shade the
-  region around them, or draw your own shaded regions.
-* **Zoom** ternary plots to the data. Water-rich gels all sit near one
-  corner otherwise.
-* Export **PNG / SVG / PDF** (matplotlib, for papers) and **interactive
-  HTML** (plotly, hover and rotate).
+## Start it (about 5 minutes the first time)
 
-## Install & run
+1. **Install Python** (one time only) from
+   <https://www.python.org/downloads/>. On Windows, **tick "Add python.exe to
+   PATH"** on the first screen of the installer.
+2. **Download this program:** on the GitHub page, click the green **Code**
+   button, then **Download ZIP**. Unzip it somewhere easy to find, such as
+   your Desktop.
+3. **Double-click the launcher** in the unzipped folder:
+   * **Windows:** `start_app.bat`
+   * **Mac:** `start_app.command`. If the Mac says it can't be opened,
+     right-click it, choose **Open**, then click **Open** again.
+4. A black window appears and sets things up. The first time this takes a
+   few minutes. Then **the program opens in your web browser.**
+   **Keep the black window open while you work**, and close it when you're
+   done.
 
-You need Python 3.10 or newer.
+Next time, just double-click the launcher again; it starts in seconds.
 
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
+## Make your first diagram
 
-The app opens in your browser. On Windows you can also double-click
-`start_app.bat`; on macOS/Linux run `./start_app.sh`.
+The program opens with example data, so you can try step 4 straight away.
 
-## Using the app
+1. **Bring in your data.** In the left panel, drop your Excel file into the
+   box, or click **Empty project** to type it in.
+   *No spreadsheet yet?* Open **Spreadsheets to fill in** on the left and
+   download the **blank template** or the **practice workbook**.
+2. **① Ingredients tab:** check that every ingredient has the right *role*:
+   water, filler, host, guest or other. To add a second polymer or another
+   host, click the empty row at the bottom. Press **Apply**.
+3. **② Samples tab:** one row per sample, with amounts in **wt %**. Add
+   columns for what you measured (stiffness, swelling, gelled yes/no...).
+   Press **Save**. **Fill water to 100 %** does the water for you.
+4. **③ Make a plot tab:** click one of the **ready-made plots**, then change
+   anything you like:
+   * **What goes on each axis:** single ingredients, or *All hosts (sum)*
+     and so on.
+   * **Dot size / color / shape:** for example size = stiffness,
+     color = gelled, shape = host type.
+   * **Highlight samples:** for example *gelled is yes* or *G' greater than
+     10*. Optionally grey out the rest or shade the area around them.
+   * **Zoom in on my samples:** use this when water is a corner and every
+     point sits at the top.
+5. **Download the plot:** PNG for slides, SVG or PDF for papers, or HTML for
+   an interactive version that opens in any browser.
+6. **Save your work:** click **Download project (.xlsx)** on the left.
+   Next time, drop that file into the box to carry on where you left off.
 
-1. **Components tab**: one row per ingredient with its role (`water`,
-   `filler`, `host`, `guest`, `other`) and an optional color. Press
-   *Apply component changes*. Renaming keeps the data, and deleting a row
-   removes that column.
-2. **Samples tab**: one row per formulation, with component amounts in
-   **wt %**. Add property columns (number, yes/no or text) for what you
-   measured. *Fill water to 100 %* sets water to whatever is left. Press
-   *Save table* after editing.
-3. **Plot tab**: choose the plot type, the axes and the encodings. The
-   settings can be saved as presets, and presets are stored in the project
-   file.
-4. **Save**: *Download project (.xlsx)* in the sidebar. Upload it later to
-   carry on.
+The **❓ Help** tab inside the program has the same guide.
 
-## Practice workbook
+## Using your own Excel file
 
-`examples/mock_hydrogel_data.xlsx` is a practice file with made-up data.
-Each tab is a different hydrogel system with its own components:
+* Put **one row per sample** in a tab: a `sample` column, then one column
+  per ingredient (amounts in wt %), then any measured columns.
+* Optionally add a tab called `components` with `name` and `role` columns.
+  Without it, roles are guessed from the names (Laponite → filler,
+  β-CD → host, PEG → guest), and you can fix them on the Ingredients tab.
+* **Several tabs are fine**, for example one per hydrogel system. After you
+  drop the file in, choose a tab under **Which tab?**, or choose
+  **(all tabs combined)** to compare them on one plot. A `dataset` column
+  then tells you which tab each sample came from, so you can color by it.
+* Water can be a formula such as `=100-SUM(C2:E2)`.
+
+### The practice workbook
+
+`examples/mock_hydrogel_data.xlsx` (also downloadable inside the program)
+has made-up data. Each tab is a different system with its own ingredients:
 
 | tab                   | filler(s)          | host(s)            | guest(s)         | other    |
 |-----------------------|--------------------|--------------------|------------------|----------|
@@ -60,31 +81,29 @@ Each tab is a different hydrogel system with its own components:
 | `MMT-CB8-two guests`  | MMT                | CB[8]              | PVA-Np, PVA-MV   |          |
 | `Mixed fillers-hosts` | Laponite XLG, CNC  | beta-CD, alpha-CD  | PAAm-Ad          | glycerol |
 
-It also has a `How to use` tab and a `components` tab that lists every
-ingredient's role. Blue cells are the ones you type in. Water is a formula
-(100 − everything else), so it updates when you change the other amounts.
+Blue cells are the ones you type in. Water updates itself.
 
-Upload it in the sidebar, then pick a tab under **Which tab?**. Choose
-**(all tabs combined)** to compare systems: the samples are stacked, a
-`dataset` column records which tab each one came from, and you can color,
-mark or highlight by it (`dataset == "Silica-aCD-PEG"`). Rebuild the file
-with `python examples/make_mock_workbook.py`.
+## If something goes wrong
 
-## Excel format
+* **"Python was not found":** install Python (step 1 above) and remember the
+  *Add python.exe to PATH* box. Then double-click the launcher again.
+* **The browser didn't open:** go to <http://localhost:8501> yourself while
+  the black window is open.
+* **A sample is missing from the plot:** the note under the plot says which
+  samples were left out and why.
+* Anything else: copy the text from the black window and send it to whoever
+  set this up for you.
 
-| sheet        | columns                                                           |
-|--------------|-------------------------------------------------------------------|
-| `samples`    | `sample`, one column per component (wt %), then property columns  |
-| `components` | `name`, `role`, `color`, `notes`                                  |
-| `plots`      | saved plot settings (written by the app, optional)                |
+---
 
-A workbook can have several data tabs, for example one per system. The app
-asks which one to load, or combines them all. Tabs named `How to use`,
-`README`, `notes` and so on are skipped. A workbook with only a samples
-sheet works too. Roles are then guessed from
-the column names (*laponite* → filler, *β-CD* → host, *PEG* → guest, ...)
-and you can fix them on the Components tab. `examples/demo_project.xlsx` is
-a ready-made template. Its data are made up.
+# For programmers
+
+Start without the launchers:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
 ## Using it from Python
 
@@ -136,7 +155,7 @@ and the `... type` columns. Put names that contain spaces in back-ticks:
 go:
 
 ```bash
-python examples/make_figures.py examples/demo_project.xlsx
+python examples/make_figures.py examples/mock_hydrogel_data.xlsx
 ```
 
 ## Code layout
@@ -149,12 +168,13 @@ hydrogel_diagrams/prepare.py    shared data prep for both renderers
 hydrogel_diagrams/mpl_plots.py  static figures (matplotlib)
 hydrogel_diagrams/plotly_plots.py interactive figures (plotly)
 hydrogel_diagrams/io.py         Excel / CSV import and export
-examples/                       practice workbook, demo project, scripts
+examples/                       practice workbook (+ the script that builds
+                                it), demo project, batch-figure script
 tests/                          pytest suite
 ```
 
 To add a new plot type, add its name to `PLOT_KINDS` in `spec.py` and add a
-branch in `mpl_plots.plot` and `plotly_plots.plot`. `prepare()` already
+branch in `mpl_plots._draw` and `plotly_plots.plot`. `prepare()` already
 provides the coordinates, sizes, colors and highlight flags.
 
 ## Tests

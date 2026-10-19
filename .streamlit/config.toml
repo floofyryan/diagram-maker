@@ -1,0 +1,12 @@
+# Settings for running the Diagram Maker on your own computer.
+[server]
+showEmailPrompt = false   # don't ask for an email on first start
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"   # hide the developer "Deploy" menu
+
+[theme]
+base = "light"

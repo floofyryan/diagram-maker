@@ -6,6 +6,7 @@ The numbers are synthetic and only meant to show what the plots look like.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 
 from .model import Project
 from .spec import Axis, PlotSpec, Region
@@ -82,3 +83,61 @@ def example_plots() -> dict[str, PlotSpec]:
             title="Raw wt% (size = G')",
         ),
     }
+
+
+def quick_plots(project: Project) -> dict[str, PlotSpec]:
+    """Ready-made plots that work with whatever data is loaded.
+
+    They only use roles (all fillers, all hosts, ...) and pick the first
+    yes/no and numeric property columns for color and dot size.
+    """
+    has = {r: bool(project.components_by_role(r))
+           for r in ("water", "filler", "host", "guest")}
+    props = project.property_names
+    yes_no = [c for c in props
+              if project.samples[c].dropna().map(type).isin([bool]).all()
+              and project.samples[c].notna().any()]
+    numeric = [c for c in props if c not in yes_no
+               and pd.api.types.is_numeric_dtype(project.samples[c])
+               and project.samples[c].notna().any()]
+    size = numeric[0] if numeric else ""
+    flag = yes_no[0] if yes_no else ""
+    out = {}
+    if has["filler"] and has["host"] and has["guest"]:
+        out["Triangle: fillers / hosts / guests"] = PlotSpec(
+            kind="ternary",
+            axes=[Axis(["role:filler"]), Axis(["role:host"]),
+                  Axis(["role:guest"])],
+            size_by=size, color_by="filler type", marker_by="host type",
+            title="Solids composition (water left out)")
+        if has["water"]:
+            out["Triangle with water (zoomed in)"] = PlotSpec(
+                kind="ternary",
+                axes=[Axis(["role:water"]), Axis(["role:filler"]),
+                      Axis(["role:host", "role:guest"], label="host + guest")],
+                size_by=size, color_by=flag or "filler type", zoom=True,
+                title="Whole formulation")
+        out["3D: amount of filler, host, guest"] = PlotSpec(
+            kind="scatter3d",
+            axes=[Axis(["role:filler"]), Axis(["role:host"]),
+                  Axis(["role:guest"])],
+            size_by=size, color_by=flag or "filler type",
+            marker_by="filler type", title="Amounts (wt %)")
+    if has["host"] and numeric:
+        out[f"2D: hosts vs {numeric[0]}"] = PlotSpec(
+            kind="scatter2d", axes=[Axis(["role:host"]), Axis([numeric[0]])],
+            color_by=flag or "filler type", title="")
+    return out
+
+
+def blank_template() -> Project:
+    """A starter project: one ingredient per role and one example row."""
+    p = Project()
+    p.add_component("water", "water", "", "the solvent")
+    p.add_component("my filler", "filler", "", "rename me, e.g. Laponite")
+    p.add_component("my host", "host", "", "rename me, e.g. beta-CD")
+    p.add_component("my guest polymer", "guest", "", "rename me, e.g. PEG-Ad")
+    p.add_sample("example-1", **{"water": 92, "my filler": 2, "my host": 3,
+                                 "my guest polymer": 3},
+                 properties={"G' (kPa)": 10.0, "gelled": True})
+    return p

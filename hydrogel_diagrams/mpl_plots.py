@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from matplotlib.colors import Normalize  # noqa: E402
+from matplotlib.colors import Normalize, to_rgba  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import Patch, Polygon  # noqa: E402
 
@@ -38,6 +38,15 @@ def tern_xy(a, b, c, mins=(0.0, 0.0, 0.0)):
 def plot(project: Project, spec: PlotSpec, figsize=(8, 6.5)) -> plt.Figure:
     prep = prepare(project, spec)
     fig = plt.figure(figsize=figsize)
+    try:
+        _draw(fig, prep, spec)
+    except Exception:
+        plt.close(fig)
+        raise
+    return fig
+
+
+def _draw(fig, prep: Prepared, spec: PlotSpec) -> None:
     if spec.kind == "ternary":
         ax = fig.add_subplot(111)
         mins = prep.tern_min
@@ -82,7 +91,6 @@ def plot(project: Project, spec: PlotSpec, figsize=(8, 6.5)) -> plt.Figure:
     if spec.title:
         ax.set_title(spec.title)
     fig.tight_layout()
-    return fig
 
 
 def to_bytes(fig: plt.Figure, fmt: str = "png", dpi: int = 300) -> bytes:
@@ -190,13 +198,15 @@ def _draw_points(ax, prep: Prepared, spec: PlotSpec, to_xy):
         norm = Normalize(vals.min(), vals.max() if vals.max() > vals.min()
                          else vals.min() + 1)
 
-    def colors_for(sub):
+    def colors_for(sub):  # always an (n, 4) RGBA array
         if prep.color_mode == "category":
-            return [prep.category_colors[c] for c in sub["color"]]
-        if prep.color_mode == "continuous":
-            return [cmap(norm(v)) if not np.isnan(v) else DIM_COLOR
+            cols = [to_rgba(prep.category_colors[c]) for c in sub["color"]]
+        elif prep.color_mode == "continuous":
+            cols = [cmap(norm(v)) if not np.isnan(v) else to_rgba(DIM_COLOR)
                     for v in sub["color"].astype(float)]
-        return ["#0072B2"] * len(sub)
+        else:
+            cols = [to_rgba("#0072B2")] * len(sub)
+        return np.array(cols).reshape(-1, 4)
 
     groups = prep.marker_categories or [""]
     mappable = None

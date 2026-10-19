@@ -54,6 +54,12 @@ class Prepared:
         return self.marker_categories.index(value) % len(MPL_MARKERS)
 
 
+def as_float(s: pd.Series) -> pd.Series:
+    """Numbers as floats; yes/no values become 1/0; anything else NaN."""
+    s = s.map(lambda v: float(v) if isinstance(v, (bool, np.bool_)) else v)
+    return pd.to_numeric(s, errors="coerce").astype(float)
+
+
 def is_categorical(s: pd.Series) -> bool:
     if pd.api.types.is_bool_dtype(s) or not pd.api.types.is_numeric_dtype(s):
         return True
@@ -80,8 +86,14 @@ def apply_highlight(project: Project, expr: str) -> pd.Series:
     df = query_frame(project)
     if not expr.strip():
         return pd.Series(True, index=df.index)
+    # Older pandas can't parse some back-ticked names (e.g. "G' (kPa)"), so
+    # give such columns plain stand-in names for the query.
+    renames = {c: f"_col{i}" for i, c in enumerate(df.columns)
+               if not str(c).isidentifier()}
+    for col, safe in renames.items():
+        expr = expr.replace(f"`{col}`", safe)
     try:
-        idx = df.query(expr, engine="python").index
+        idx = df.rename(columns=renames).query(expr, engine="python").index
     except Exception as exc:  # noqa: BLE001 - surface any query error
         raise ValueError(f"could not apply highlight {expr!r}: {exc}") from exc
     return pd.Series(df.index.isin(idx), index=df.index)
@@ -120,7 +132,7 @@ def prepare(project: Project, spec: PlotSpec) -> Prepared:
     for i, ax in enumerate(spec.axes):
         if not ax.terms:
             raise ValueError(f"axis {i + 1} has nothing selected")
-        df[f"c{i}"] = pd.to_numeric(project.resolve(ax.terms), errors="coerce")
+        df[f"c{i}"] = as_float(project.resolve(ax.terms))
         labels.append(ax.label or project.label_for(ax.terms))
 
     coords = [f"c{i}" for i in range(spec.n_axes)]
@@ -139,7 +151,7 @@ def prepare(project: Project, spec: PlotSpec) -> Prepared:
 
     # -- size --------------------------------------------------------------
     if spec.size_by:
-        v = pd.to_numeric(project.resolve(spec.size_by), errors="coerce")
+        v = as_float(project.resolve(spec.size_by))
         lo, hi = v.min(), v.max()
         if pd.isna(lo):
             df["size01"] = 0.0
@@ -166,7 +178,7 @@ def prepare(project: Project, spec: PlotSpec) -> Prepared:
             df["color"] = v
         else:
             prep.color_mode = "continuous"
-            df["color"] = pd.to_numeric(v, errors="coerce")
+            df["color"] = as_float(v)
     else:
         df["color"] = None
 
